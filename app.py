@@ -481,6 +481,16 @@ def _get_leads_from_request():
     return None
 
 
+def _format_signals(signals):
+    """Return signals as a semicolon-joined string, handling list, string, and empty/null."""
+    if not signals:
+        return ""
+    if isinstance(signals, list):
+        return "; ".join(str(s) for s in signals)
+    # Already a string (or other scalar) — use as-is
+    return str(signals)
+
+
 def _build_csv(leads):
     """Build CSV content with stats header + data rows."""
     output = io.StringIO()
@@ -526,7 +536,7 @@ def _build_csv(leads):
             lead.get("status", ""),
             lead.get("design", ""),
             "Yes" if lead.get("mobileFriendly") else "No",
-            "; ".join(lead.get("signals", [])),
+            _format_signals(lead.get("signals", "")),
             lead.get("priority", ""),
             lead.get("socialPlatform", ""),
         ]
@@ -635,7 +645,7 @@ def export_to_sheets():
             lead.get("status", ""),
             lead.get("design", ""),
             "Yes" if lead.get("mobileFriendly") else "No",
-            "; ".join(lead.get("signals", [])),
+            _format_signals(lead.get("signals", "")),
             str(lead.get("priority", "")),
             lead.get("socialPlatform", ""),
         ]
