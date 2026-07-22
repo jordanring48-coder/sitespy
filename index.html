@@ -1091,7 +1091,15 @@ function closeExportMenu() {
 
 async function downloadCSV() {
   closeExportMenu();
-  if (!savedLeads.length) return;
+
+  // Guard with user-visible feedback
+  if (!Array.isArray(savedLeads) || !savedLeads.length) {
+    showExportError('No leads to export. Save some leads first!');
+    return;
+  }
+
+  const btn = document.querySelector('#export-dropdown .btn-export');
+  if (btn) btn.textContent = '⏳ Exporting...';
 
   try {
     const resp = await fetch('/api/export', {
@@ -1099,24 +1107,43 @@ async function downloadCSV() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ leads: savedLeads }),
     });
+
     if (!resp.ok) {
-      const err = await resp.json();
-      showExportError(err.error || 'Failed to generate CSV');
+      let errMsg = 'Failed to generate CSV';
+      try {
+        const err = await resp.json();
+        errMsg = err.error || errMsg;
+      } catch (_) {}
+      showExportError(errMsg);
+      if (btn) btn.textContent = '📤 Export';
       return;
     }
+
+    // Read as blob and trigger download
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
+
+    // Try to get filename from Content-Disposition, fall back to default
     const disp = resp.headers.get('Content-Disposition') || '';
-    const match = disp.match(/filename="?(.+?)"?$/);
-    a.download = match ? match[1] : 'sitespy-leads.csv';
+    const match = disp.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    a.download = match ? match[1].replace(/['"]/g, '') : 'sitespy-leads.csv';
+
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // Clean up after a short delay to ensure the download starts
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+
+    if (btn) btn.textContent = '📤 Export';
   } catch (e) {
-    showExportError('Network error — could not reach the server.');
+    showExportError('Network error — could not reach the server. Try again.');
+    if (btn) btn.textContent = '📤 Export';
   }
 }
 
