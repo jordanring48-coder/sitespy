@@ -1103,13 +1103,7 @@ function downloadCSV() {
   try {
     const json = JSON.stringify(savedLeads);
     const encoded = encodeURIComponent(json);
-    const a = document.createElement('a');
-    a.href = '/api/export?leads=' + encoded;
-    a.download = 'sitespy-leads.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    window.open('/api/export?leads=' + encoded, '_blank');
   } catch (e) {
     showExportError('Failed to generate CSV — data may be too large. Try exporting fewer leads.');
   }
