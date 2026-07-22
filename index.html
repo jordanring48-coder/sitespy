@@ -502,6 +502,7 @@ function loadSavedLeads() {
   try {
     const data = localStorage.getItem('sitespy_saved_leads');
     savedLeads = data ? JSON.parse(data) : [];
+    if (!Array.isArray(savedLeads)) savedLeads = [];
   } catch(e) { savedLeads = []; }
 }
 function saveToStorage() {
@@ -592,7 +593,7 @@ function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tab-analyze').classList.toggle('active', tab === 'analyze');
   document.getElementById('tab-saved').classList.toggle('active', tab === 'saved');
-  closeSidebar();
+  closeSidebar(true);
   renderCurrentTab();
 }
 
@@ -640,6 +641,7 @@ function renderAnalyzeTab(main) {
 
 function renderEmptyState() {
   const area = document.getElementById('analyze-results');
+  if (!area) return;
   area.innerHTML = `
     <div class="state-box">
       <div class="icon">🔎</div>
@@ -662,6 +664,7 @@ function renderLoading() {
 
 function renderError(msg) {
   const area = document.getElementById('analyze-results');
+  if (!area) return;
   area.innerHTML = `
     <div class="error-msg">⚠️ ${escapeHtml(msg)}</div>
     <div class="state-box">
@@ -674,6 +677,7 @@ function renderError(msg) {
 
 function renderResults() {
   const area = document.getElementById('analyze-results');
+  if (!area) return;
   let filtered = searchResults;
   if (hideModern) {
     filtered = searchResults.filter(r => !(r.status === 'Modern' && r.mobileFriendly));
@@ -709,14 +713,14 @@ function renderResults() {
     const statusClass = statusToClass(r.status);
     const saved = isLeadSaved(r.id);
     rows += `
-      <tr onclick="openDetail('${escapeAttr(r.id)}')">
+      <tr class="row-detail" data-lead-id="${escapeAttr(r.id)}">
         <td class="name-col">${escapeHtml(r.name)}</td>
         <td>${escapeHtml(r.niche)}</td>
         <td class="website-col">${domain ? `<a href="${escapeAttr(r.website)}" target="_blank" onclick="event.stopPropagation()" title="${escapeAttr(r.website)}">${escapeHtml(domain)}</a>` : '<span style="color:#64748b">—</span>'}</td>
         <td><span class="status-badge ${statusClass}">${escapeHtml(r.status)}</span></td>
         <td>${escapeHtml(r.design)}</td>
         <td>${r.mobileFriendly ? '<span class="mobile-icon mobile-ok">✅</span>' : '<span class="mobile-icon mobile-bad">❌</span>'}</td>
-        <td><button class="btn-save ${saved ? 'saved' : ''}" onclick="event.stopPropagation();toggleSaveLeadById('${escapeAttr(r.id)}');renderResults();">${saved ? '★ Saved' : '☆ Save'}</button></td>
+        <td><button class="btn-save btn-save-lead ${saved ? 'saved' : ''}" data-lead-id="${escapeAttr(r.id)}">${saved ? '★ Saved' : '☆ Save'}</button></td>
       </tr>
     `;
   }
@@ -808,7 +812,7 @@ function openDetail(id) {
       <div class="field"><span class="label">Signals</span><div class="signals-list">${signalsHtml}</div></div>
       <div class="field"><span class="label">Mobile Friendly</span><span class="mobile-status ${lead.mobileFriendly ? 'yes' : 'no'}">${lead.mobileFriendly ? '✅ Yes' : '❌ No'}</span></div>
       <div class="field"><span class="label">Priority</span><span class="priority-score ${priorityClass}">${priorityLabel} (${lead.priority})</span></div>
-      <button class="btn-save-lead ${saved ? 'saved' : ''}" onclick="toggleSaveLeadById('${escapeAttr(lead.id)}');openDetail('${escapeAttr(lead.id)}')">${saved ? '★ Lead Saved' : '☆ Save Lead'}</button>
+      <button class="btn-save-lead ${saved ? 'saved' : ''}" data-lead-id="${escapeAttr(lead.id)}">${saved ? '★ Lead Saved' : '☆ Save Lead'}</button>
       <div class="timestamp">Last analyzed: ${formatDate(lead.lastAnalyzed)}</div>
     </div>
   `;
@@ -818,13 +822,13 @@ function openDetail(id) {
   document.body.style.overflow = 'hidden';
 }
 
-function closeSidebar() {
+function closeSidebar(skipRender = false) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('overlay').classList.remove('open');
   document.body.style.overflow = '';
   currentDetailLead = null;
   // Refresh results in case save state changed
-  if (activeTab === 'analyze' && searchResults.length > 0) renderResults();
+  if (activeTab === 'analyze' && searchResults.length > 0 && !skipRender) renderResults();
 }
 
 function toggleSaveLeadById(id) {
@@ -863,7 +867,7 @@ function renderSavedTab(main) {
             · Saved ${formatDate(lead.savedAt)}
           </div>
         </div>
-        <button class="btn-danger" onclick="confirmRemove('${escapeAttr(lead.id)}')">Remove</button>
+        <button class="btn-danger btn-confirm-remove" data-lead-id="${escapeAttr(lead.id)}">Remove</button>
       </div>
     `;
   }
@@ -889,7 +893,7 @@ function confirmRemove(id) {
         <p>Remove <strong>${escapeHtml(lead.name)}</strong>?</p>
         <div class="btns">
           <button class="btn-cancel" onclick="cancelRemove()">Cancel</button>
-          <button class="btn-confirm" onclick="doRemove('${escapeAttr(id)}')">Remove</button>
+          <button class="btn-confirm btn-do-remove" data-lead-id="${escapeAttr(id)}">Remove</button>
         </div>
       </div>
     </div>
@@ -948,6 +952,45 @@ function formatDate(iso) {
     return new Date(iso).toLocaleString();
   } catch { return iso; }
 }
+
+// ===== DELEGATED CLICK HANDLER =====
+// Replaces all inline onclick handlers that embed dynamic lead IDs.
+// Uses data-lead-id attributes + event delegation for reliable ID handling.
+document.addEventListener('click', function(e) {
+  const el = e.target.closest('[data-lead-id]');
+  if (!el) return;
+  const id = el.dataset.leadId;
+  
+  // Table save button or sidebar save button
+  if (el.classList.contains('btn-save-lead')) {
+    e.stopPropagation();
+    toggleSaveLeadById(id);
+    if (el.closest('#sidebar')) {
+      openDetail(id);
+    } else {
+      renderResults();
+    }
+    return;
+  }
+  
+  // Table row click → open detail
+  if (el.classList.contains('row-detail')) {
+    openDetail(id);
+    return;
+  }
+  
+  // Saved leads remove button
+  if (el.classList.contains('btn-confirm-remove')) {
+    confirmRemove(id);
+    return;
+  }
+  
+  // Confirmation dialog confirm button
+  if (el.classList.contains('btn-do-remove')) {
+    doRemove(id);
+    return;
+  }
+});
 
 // ===== INIT =====
 loadSavedLeads();
