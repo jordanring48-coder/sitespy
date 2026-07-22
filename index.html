@@ -1101,25 +1101,84 @@ function downloadCSV() {
   if (btn) btn.textContent = '⏳ Exporting...';
 
   try {
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/api/export';
-    form.style.display = 'none';
-    
-    var input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = JSON.stringify({ leads: savedLeads });
-    
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
+    // Build stats
+    var statusCounts = {};
+    var nicheCounts = {};
+    savedLeads.forEach(function(l) {
+      var s = l.status || 'Unknown';
+      statusCounts[s] = (statusCounts[s] || 0) + 1;
+      var n = l.niche || 'Unknown';
+      nicheCounts[n] = (nicheCounts[n] || 0) + 1;
+    });
+
+    var topNiches = Object.entries(nicheCounts)
+      .sort(function(a, b) { return b[1] - a[1]; })
+      .slice(0, 3)
+      .map(function(e) { return e[0] + ' (' + e[1] + ')'; })
+      .join(', ');
+
+    var statusSummary = Object.entries(statusCounts)
+      .map(function(e) { return e[0] + ' (' + e[1] + ')'; })
+      .join(', ');
+
+    // Build CSV content
+    var lines = [];
+    var today = new Date().toISOString().split('T')[0];
+    lines.push('# SiteSpy Lead Export — ' + today);
+    lines.push('# Total Leads: ' + savedLeads.length);
+    lines.push('# By Status: ' + statusSummary);
+    lines.push('# Top Niches: ' + topNiches);
+    lines.push('');
+    lines.push('Business Name,Niche,Address,Phone,Rating,Reviews,Website,Status,Design,Mobile Friendly,Signals,Priority,Social Platform');
+
+    savedLeads.forEach(function(lead) {
+      var signals = lead.signals || '';
+      if (Array.isArray(signals)) signals = signals.join('; ');
+      var row = [
+        csvCell(lead.name),
+        csvCell(lead.niche),
+        csvCell(lead.address),
+        csvCell(lead.phone),
+        lead.rating || '',
+        lead.ratingCount || '',
+        csvCell(lead.website),
+        csvCell(lead.status),
+        csvCell(lead.design),
+        lead.mobileFriendly ? 'Yes' : 'No',
+        csvCell(signals),
+        lead.priority || '',
+        csvCell(lead.socialPlatform)
+      ];
+      lines.push(row.join(','));
+    });
+
+    var csv = lines.join('\n');
+
+    // Download via Blob — fully synchronous, no fetch, no form, no window.open
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'sitespy-leads-' + today + '.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   } catch (e) {
-    showExportError('Failed to generate CSV. Try exporting fewer leads.');
+    showExportError('Failed to generate CSV. Try again.');
   }
 
   if (btn) btn.textContent = '📤 Export';
+}
+
+function csvCell(val) {
+  if (val === null || val === undefined) return '';
+  var s = String(val);
+  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
 }
 
 async function exportToSheets() {
