@@ -1097,15 +1097,27 @@ function downloadCSV() {
     return;
   }
 
-  const btn = document.querySelector('#export-dropdown .btn-export');
+  var btn = document.querySelector('#export-dropdown .btn-export');
   if (btn) btn.textContent = '⏳ Exporting...';
 
   try {
-    const json = JSON.stringify(savedLeads);
-    const encoded = encodeURIComponent(json);
-    window.open('/api/export?leads=' + encoded, '_blank');
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/api/export';
+    form.target = '_blank';
+    form.style.display = 'none';
+    
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify({ leads: savedLeads });
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
   } catch (e) {
-    showExportError('Failed to generate CSV — data may be too large. Try exporting fewer leads.');
+    showExportError('Failed to generate CSV. Try exporting fewer leads.');
   }
 
   if (btn) btn.textContent = '📤 Export';

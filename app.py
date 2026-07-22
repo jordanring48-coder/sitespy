@@ -463,10 +463,20 @@ CSV_HEADERS = [
 
 def _get_leads_from_request():
     """Extract leads list from request body (JSON) or query param."""
-    # Try JSON body first (works for both GET and POST with body)
+    # Try JSON body first
     data = request.get_json(silent=True)
     if data and isinstance(data, dict) and "leads" in data:
         return data["leads"]
+
+    # Try form-encoded payload (from hidden form POST)
+    payload = request.form.get("payload", "")
+    if payload:
+        try:
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict) and "leads" in parsed:
+                return parsed["leads"]
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     # Try query param: ?leads=<JSON array>
     leads_param = request.args.get("leads", "")
