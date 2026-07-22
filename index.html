@@ -945,7 +945,7 @@ function renderSavedTab(main) {
             · Saved ${formatDate(lead.savedAt)}
           </div>
         </div>
-        <button class="btn-danger btn-confirm-remove" data-lead-id="${escapeAttr(lead.id)}">Remove</button>
+        <button class="btn-danger" onclick="startRemove('${escapeAttr(lead.id)}')">Remove</button>
       </div>
     `;
   }
@@ -954,6 +954,7 @@ function renderSavedTab(main) {
     ${statsHtml}
     <div class="saved-actions">
       <button class="btn-secondary" onclick="loadSeedLeads()">📥 Load Previous Leads</button>
+      <button class="btn-danger" onclick="clearAllLeads()" style="margin-left:8px;">🗑 Clear All</button>
       <button class="btn-export" onclick="toggleExportData()">📋 Export Data</button>
     </div>
     <div id="export-panel" style="display:none; margin-top:16px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:16px; max-height:400px; overflow:auto;">
@@ -968,35 +969,40 @@ function renderSavedTab(main) {
 }
 
 // ===== CONFIRM REMOVE =====
-function confirmRemove(id) {
-  const lead = savedLeads.find(l => l.id === id);
+var removeTargetId = null;
+
+function startRemove(id) {
+  var lead = savedLeads.find(function(l) { return l.id === id; });
   if (!lead) return;
-  const dialog = document.getElementById('confirm-dialog');
+  removeTargetId = id;
+  var dialog = document.getElementById('confirm-dialog');
   dialog.style.display = 'block';
-  dialog.innerHTML = `
-    <div class="confirm-overlay" onclick="event.target===this&&cancelRemove()">
-      <div class="confirm-dialog" onclick="event.stopPropagation()">
-        <p>Remove <strong>${escapeHtml(lead.name)}</strong>?</p>
-        <div class="btns">
-          <button class="btn-cancel" onclick="cancelRemove()">Cancel</button>
-          <button class="btn-confirm btn-do-remove" data-lead-id="${escapeAttr(id)}">Remove</button>
-        </div>
-      </div>
-    </div>
-  `;
+  dialog.innerHTML = 
+    '<div class="confirm-overlay" onclick="cancelRemove()">' +
+      '<div class="confirm-dialog" onclick="event.stopPropagation()">' +
+        '<p>Remove <strong>' + escapeHtml(lead.name) + '</strong>?</p>' +
+        '<div class="btns">' +
+          '<button class="btn-cancel" onclick="cancelRemove()">Cancel</button>' +
+          '<button class="btn-confirm" onclick="doRemoveCurrent()">Remove</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
 }
 
-function cancelRemove() {
-  document.getElementById('confirm-dialog').style.display = 'none';
-  document.getElementById('confirm-dialog').innerHTML = '';
-}
-
-function doRemove(id) {
-  savedLeads = savedLeads.filter(l => l.id !== id);
+function doRemoveCurrent() {
+  if (!removeTargetId) return;
+  savedLeads = savedLeads.filter(function(l) { return l.id !== removeTargetId; });
+  removeTargetId = null;
   saveToStorage();
   updateSavedBadge();
   cancelRemove();
   renderCurrentTab();
+}
+
+function cancelRemove() {
+  removeTargetId = null;
+  document.getElementById('confirm-dialog').style.display = 'none';
+  document.getElementById('confirm-dialog').innerHTML = '';
 }
 
 // ===== EXPORT FUNCTIONS =====
@@ -1074,6 +1080,16 @@ function copyExportData() {
   });
 }
 
+// ===== CLEAR ALL =====
+function clearAllLeads() {
+  if (!savedLeads.length) return;
+  if (!confirm('Remove all ' + savedLeads.length + ' saved leads? This cannot be undone.')) return;
+  savedLeads = [];
+  saveToStorage();
+  updateSavedBadge();
+  renderCurrentTab();
+}
+
 // ===== HELPERS =====
 function statusToClass(status) {
   const map = {
@@ -1140,17 +1156,6 @@ document.addEventListener('click', function(e) {
     return;
   }
   
-  // Saved leads remove button
-  if (el.classList.contains('btn-confirm-remove')) {
-    confirmRemove(id);
-    return;
-  }
-  
-  // Confirmation dialog confirm button
-  if (el.classList.contains('btn-do-remove')) {
-    doRemove(id);
-    return;
-  }
 });
 
 // ===== INIT =====
