@@ -19,7 +19,7 @@ PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
 WEBSITE_TIMEOUT = 10
 PLACES_TIMEOUT = 30
 FIELD_MASK = (
-    "places.displayName,places.formattedAddress,places.phoneNumber,"
+    "places.displayName,places.formattedAddress,places.nationalPhoneNumber,"
     "places.websiteUri,places.rating,places.userRatingCount,"
     "places.types,places.id"
 )
@@ -396,7 +396,7 @@ def analyze():
         place_id = place.get("id", "")
         name = place.get("displayName", {}).get("text", "Unknown")
         address = place.get("formattedAddress", "")
-        phone = place.get("phoneNumber", "")
+        phone = place.get("nationalPhoneNumber", "")
         rating = place.get("rating")
         rating_count = place.get("userRatingCount", 0)
         website = place.get("websiteUri", "")
