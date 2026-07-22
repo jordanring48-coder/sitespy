@@ -415,15 +415,6 @@ td.website-col a {
 .saved-card .info .meta { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
 .saved-card .info .meta a { color: #64748b; font-size: 0.8rem; }
 
-.export-hint {
-  text-align: center;
-  color: #64748b;
-  font-size: 0.82rem;
-  padding: 16px;
-  margin-top: 8px;
-  border-top: 1px solid #334155;
-}
-
 /* ===== CONFIRM DIALOG ===== */
 .confirm-overlay {
   position: fixed;
@@ -455,12 +446,8 @@ td.website-col a {
 .confirm-dialog .btns .btn-cancel { background: #334155; color: #e2e8f0; }
 .confirm-dialog .btns .btn-confirm { background: #ef4444; color: #fff; }
 
-/* ===== EXPORT DROPDOWN ===== */
-.export-dropdown {
-  position: relative;
-  display: inline-block;
-}
-.export-dropdown .btn-export {
+/* ===== EXPORT BUTTON ===== */
+.btn-export {
   padding: 10px 18px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -469,43 +456,12 @@ td.website-col a {
   border: none;
   border-radius: 8px;
   transition: opacity 0.15s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
 }
-.export-dropdown .btn-export:hover { opacity: 0.9; }
-.export-menu {
-  display: none;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  min-width: 210px;
-  z-index: 50;
-  overflow: hidden;
-}
-.export-menu.open { display: block; }
-.export-menu button {
-  display: block;
-  width: 100%;
-  padding: 11px 16px;
-  font-size: 0.88rem;
-  font-weight: 500;
-  background: transparent;
-  border: none;
-  color: #e2e8f0;
-  text-align: left;
-  transition: background 0.1s;
-}
-.export-menu button:hover { background: rgba(245,158,11,0.1); }
-.export-menu button:disabled { opacity: 0.5; cursor: not-allowed; }
-.export-menu .divider {
-  border-top: 1px solid #334155;
-  margin: 0;
-}
+.btn-export:hover { opacity: 0.9; }
 
 /* ===== STATS BAR ===== */
 .stats-bar {
@@ -543,39 +499,6 @@ td.website-col a {
   font-size: 0.78rem;
   padding: 3px 10px;
   border-radius: 12px;
-}
-
-/* ===== SHEETS RESULT ===== */
-.sheets-result {
-  background: rgba(34,197,94,0.1);
-  border: 1px solid rgba(34,197,94,0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-top: 12px;
-  font-size: 0.88rem;
-  color: #4ade80;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.sheets-result a { color: #f59e0b; font-weight: 600; }
-.sheets-result button.close-notice {
-  margin-left: auto;
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 1rem;
-  cursor: pointer;
-}
-.sheets-error {
-  background: rgba(239,68,68,0.1);
-  border: 1px solid rgba(239,68,68,0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-top: 12px;
-  font-size: 0.88rem;
-  color: #fca5a5;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -1031,16 +954,15 @@ function renderSavedTab(main) {
     ${statsHtml}
     <div class="saved-actions">
       <button class="btn-secondary" onclick="loadSeedLeads()">📥 Load Previous Leads</button>
-      <div class="export-dropdown" id="export-dropdown">
-        <button class="btn-export" id="btn-export-toggle" onclick="toggleExportMenu(event)">📤 Export</button>
-        <div class="export-menu" id="export-menu">
-          <button onclick="downloadCSV()">📄 Download CSV</button>
-          <div class="divider"></div>
-          <button onclick="exportToSheets()">📊 Send to Google Sheets</button>
-        </div>
-      </div>
+      <button class="btn-export" onclick="toggleExportData()">📋 Export Data</button>
     </div>
-    <div id="export-result"></div>
+    <div id="export-panel" style="display:none; margin-top:16px; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:16px; max-height:400px; overflow:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="color:#f59e0b;">📋 Export Data</strong>
+        <button id="btn-copy-export" onclick="copyExportData()" style="background:#334155; color:#e2e8f0; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem;">📋 Copy</button>
+      </div>
+      <pre id="export-content" style="color:#94a3b8; font-size:0.8rem; line-height:1.6; white-space:pre; margin:0; font-family:monospace;"></pre>
+    </div>
     ${cards}
   `;
 }
@@ -1078,167 +1000,78 @@ function doRemove(id) {
 }
 
 // ===== EXPORT FUNCTIONS =====
-function toggleExportMenu(event) {
-  event.stopPropagation();
-  const menu = document.getElementById('export-menu');
-  if (menu) menu.classList.toggle('open');
-}
-
-function closeExportMenu() {
-  const menu = document.getElementById('export-menu');
-  if (menu) menu.classList.remove('open');
-}
-
-function downloadCSV() {
-  closeExportMenu();
-
-  if (!Array.isArray(savedLeads) || !savedLeads.length) {
-    showExportError('No leads to export. Save some leads first!');
+function toggleExportData() {
+  var panel = document.getElementById('export-panel');
+  if (!panel) return;
+  
+  if (panel.style.display === 'block') {
+    panel.style.display = 'none';
     return;
   }
-
-  var btn = document.querySelector('#export-dropdown .btn-export');
-  if (btn) btn.textContent = '⏳ Exporting...';
-
-  try {
-    // Build stats
-    var statusCounts = {};
-    var nicheCounts = {};
-    savedLeads.forEach(function(l) {
-      var s = l.status || 'Unknown';
-      statusCounts[s] = (statusCounts[s] || 0) + 1;
-      var n = l.niche || 'Unknown';
-      nicheCounts[n] = (nicheCounts[n] || 0) + 1;
-    });
-
-    var topNiches = Object.entries(nicheCounts)
-      .sort(function(a, b) { return b[1] - a[1]; })
-      .slice(0, 3)
-      .map(function(e) { return e[0] + ' (' + e[1] + ')'; })
-      .join(', ');
-
-    var statusSummary = Object.entries(statusCounts)
-      .map(function(e) { return e[0] + ' (' + e[1] + ')'; })
-      .join(', ');
-
-    // Build CSV content
-    var lines = [];
-    var today = new Date().toISOString().split('T')[0];
-    lines.push('# SiteSpy Lead Export — ' + today);
-    lines.push('# Total Leads: ' + savedLeads.length);
-    lines.push('# By Status: ' + statusSummary);
-    lines.push('# Top Niches: ' + topNiches);
-    lines.push('');
-    lines.push('Business Name,Niche,Address,Phone,Rating,Reviews,Website,Status,Design,Mobile Friendly,Signals,Priority,Social Platform');
-
-    savedLeads.forEach(function(lead) {
-      var signals = lead.signals || '';
-      if (Array.isArray(signals)) signals = signals.join('; ');
-      var row = [
-        csvCell(lead.name),
-        csvCell(lead.niche),
-        csvCell(lead.address),
-        csvCell(lead.phone),
-        lead.rating || '',
-        lead.ratingCount || '',
-        csvCell(lead.website),
-        csvCell(lead.status),
-        csvCell(lead.design),
-        lead.mobileFriendly ? 'Yes' : 'No',
-        csvCell(signals),
-        lead.priority || '',
-        csvCell(lead.socialPlatform)
-      ];
-      lines.push(row.join(','));
-    });
-
-    var csv = lines.join('\n');
-
-    // Download via Blob — fully synchronous
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var filename = 'sitespy-leads-' + today + '.csv';
-
-    // Try direct download first
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-
-    // Fallback: if iframe sandbox blocks download, open in new tab
-    setTimeout(function() {
-      document.body.removeChild(a);
-      // Only open fallback if the anchor is still in the DOM
-      // (iframe sandbox will prevent download but a.click() won't throw)
-    }, 100);
-
-    // Also try window.open as backup
-    setTimeout(function() {
-      window.open(url, '_blank');
-      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-    }, 300);
-  } catch (e) {
-    showExportError('Failed to generate CSV. Try again.');
+  
+  if (!Array.isArray(savedLeads) || !savedLeads.length) {
+    alert('No leads to export. Save some leads first!');
+    return;
   }
-
-  if (btn) btn.textContent = '📤 Export';
+  
+  // Build the export text
+  var lines = [];
+  var today = new Date().toISOString().split('T')[0];
+  lines.push('SiteSpy Lead Export — ' + today);
+  lines.push('Total Leads: ' + savedLeads.length);
+  lines.push('');
+  
+  // Status breakdown
+  var statuses = {};
+  savedLeads.forEach(function(l) { var s = l.status || 'Unknown'; statuses[s] = (statuses[s] || 0) + 1; });
+  lines.push('By Status: ' + Object.entries(statuses).map(function(e) { return e[0] + ': ' + e[1]; }).join(', '));
+  lines.push('');
+  
+  // Header
+  lines.push('BUSINESS NAME | NICHE | ADDRESS | PHONE | RATING | REVIEWS | WEBSITE | STATUS | DESIGN | MOBILE | SIGNALS | PRIORITY');
+  lines.push('-'.repeat(120));
+  
+  // Data rows
+  savedLeads.forEach(function(lead) {
+    var signals = lead.signals || '';
+    if (Array.isArray(signals)) signals = signals.join(', ');
+    lines.push([
+      lead.name || '',
+      lead.niche || '',
+      lead.address || '',
+      lead.phone || '',
+      lead.rating || '',
+      lead.ratingCount || '',
+      lead.website || '',
+      lead.status || '',
+      lead.design || '',
+      lead.mobileFriendly ? 'Yes' : 'No',
+      signals,
+      lead.priority || ''
+    ].join(' | '));
+  });
+  
+  document.getElementById('export-content').textContent = lines.join('\n');
+  panel.style.display = 'block';
 }
 
-function csvCell(val) {
-  if (val === null || val === undefined) return '';
-  var s = String(val);
-  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
-}
-
-async function exportToSheets() {
-  closeExportMenu();
-  if (!savedLeads.length) return;
-
-  const resultDiv = document.getElementById('export-result');
-  if (resultDiv) {
-    resultDiv.innerHTML = '<div class="sheets-result">⏳ Sending to Google Sheets…</div>';
-  }
-
-  try {
-    const resp = await fetch('/api/export-to-sheets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leads: savedLeads, sheetName: 'SiteSpy Leads' }),
-    });
-    const data = await resp.json();
-
-    if (data.success && data.url) {
-      if (resultDiv) {
-        resultDiv.innerHTML = `
-          <div class="sheets-result">
-            ✅ Exported! <a href="${escapeAttr(data.url)}" target="_blank">Open Google Sheet →</a>
-            <button class="close-notice" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `;
-      }
-    } else {
-      showExportError(data.error || 'Export failed. Try downloading CSV instead.');
-    }
-  } catch (e) {
-    showExportError('Network error — could not reach the server.');
-  }
-}
-
-function showExportError(msg) {
-  const resultDiv = document.getElementById('export-result');
-  if (resultDiv) {
-    resultDiv.innerHTML = `<div class="sheets-error">⚠️ ${escapeHtml(msg)}</div>`;
-    setTimeout(() => {
-      if (resultDiv.querySelector('.sheets-error')) {
-        resultDiv.innerHTML = '';
-      }
-    }, 8000);
-  }
+function copyExportData() {
+  var content = document.getElementById('export-content').textContent;
+  navigator.clipboard.writeText(content).then(function() {
+    var btn = document.getElementById('btn-copy-export');
+    var orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 2000);
+  }).catch(function() {
+    // Fallback for older browsers
+    var textarea = document.createElement('textarea');
+    textarea.value = content;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert('Copied to clipboard!');
+  });
 }
 
 // ===== HELPERS =====
@@ -1331,15 +1164,6 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('sidebar').classList.contains('open')) {
       closeSidebar();
     }
-    closeExportMenu();
-  }
-});
-
-// Close export menu on outside clicks
-document.addEventListener('click', function(e) {
-  const dropdown = document.getElementById('export-dropdown');
-  if (dropdown && !dropdown.contains(e.target)) {
-    closeExportMenu();
   }
 });
 </script>
