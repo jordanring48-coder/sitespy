@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteSpy — Find local businesses that need a better website</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+a { color: #f59e0b; text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font-family: inherit; }
+
+/* ===== HEADER ===== */
+.header {
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  padding: 20px 24px;
+  text-align: center;
+}
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.header .subtitle {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+/* ===== TAB BAR ===== */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #334155;
+  background: #1e293b;
+}
+.tab-bar button {
+  flex: 1;
+  padding: 14px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #94a3b8;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.tab-bar button:hover { color: #e2e8f0; }
+.tab-bar button.active {
+  color: #f59e0b;
+  border-bottom-color: #f59e0b;
+}
+.badge {
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ===== MAIN CONTENT ===== */
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ===== SEARCH BAR ===== */
+.search-wrapper {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.search-wrapper input[type="text"] {
+  flex: 1;
+  min-width: 220px;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-wrapper input[type="text"]:focus { border-color: #f59e0b; }
+.search-wrapper input[type="text"]::placeholder { color: #64748b; }
+.search-wrapper select {
+  padding: 12px 12px;
+  font-size: 0.9rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  outline: none;
+  cursor: pointer;
+}
+.search-wrapper .btn-search {
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: #f59e0b;
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.search-wrapper .btn-search:hover { opacity: 0.9; }
+.search-wrapper .btn-search:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+.filter-row input[type="checkbox"] { accent-color: #f59e0b; width: 16px; height: 16px; }
+
+/* ===== LOADING / EMPTY / ERROR ===== */
+.state-box {
+  text-align: center;
+  padding: 60px 20px;
+}
+.state-box .icon { font-size: 3rem; margin-bottom: 12px; }
+.state-box .title { font-size: 1.1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+.state-box .desc { color: #94a3b8; font-size: 0.9rem; max-width: 500px; margin: 0 auto; }
+.state-box.error .title { color: #ef4444; }
+
+.spinner {
+  display: inline-block;
+  width: 32px; height: 32px;
+  border: 3px solid #334155;
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #fca5a5;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+/* ===== RESULTS TABLE ===== */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+thead { background: #0f172a; }
+th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+td {
+  padding: 12px 14px;
+  border-top: 1px solid #1e293b;
+  vertical-align: middle;
+}
+tbody tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+tbody tr:hover { background: rgba(245,158,11,0.06); }
+td.name-col { font-weight: 600; }
+td.website-col a {
+  color: #64748b;
+  font-size: 0.82rem;
+  max-width: 160px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-badge.no-website      { background: rgba(239,68,68,0.15); color: #f87171; }
+.status-badge.social-only     { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.status-badge.poorly-built    { background: rgba(239,68,68,0.15); color: #f87171; }
+.status-badge.outdated        { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.status-badge.basic           { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.status-badge.modern          { background: rgba(34,197,94,0.15); color: #4ade80; }
+.status-badge.website-unavailable { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+.mobile-icon { font-size: 1rem; }
+.mobile-ok { color: #22c55e; }
+.mobile-bad { color: #ef4444; }
+
+.btn-save {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-save:hover { border-color: #f59e0b; color: #f59e0b; }
+.btn-save.saved { background: rgba(245,158,11,0.12); border-color: #f59e0b; color: #f59e0b; }
+
+/* ===== DETAIL SIDEBAR ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.overlay.open { opacity: 1; pointer-events: auto; }
+
+.sidebar {
+  position: fixed;
+  top: 0; right: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  background: #1e293b;
+  border-left: 1px solid #334155;
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar.open { transform: translateX(0); }
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #334155;
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+  z-index: 2;
+}
+.sidebar-header h2 { font-size: 1.2rem; font-weight: 700; padding-right: 12px; }
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.3rem;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.btn-close:hover { color: #ef4444; }
+
+.sidebar-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.sidebar-body .field { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-body .field .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+}
+.sidebar-body .field .value { font-size: 0.95rem; color: #e2e8f0; }
+.sidebar-body .field a.value { color: #f59e0b; }
+
+.rating-stars { color: #f59e0b; font-size: 0.9rem; }
+.signals-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.signal-chip {
+  background: rgba(245,158,11,0.12);
+  color: #fbbf24;
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.mobile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.mobile-status.yes { color: #22c55e; }
+.mobile-status.no { color: #ef4444; }
+
+.priority-score {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.priority-high { background: rgba(34,197,94,0.15); color: #4ade80; }
+.priority-med { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.priority-low { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+.sidebar-body .btn-save-lead {
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: #f59e0b;
+  color: #0f172a;
+  border: none;
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+.sidebar-body .btn-save-lead:hover { opacity: 0.9; }
+.sidebar-body .btn-save-lead.saved {
+  background: rgba(245,158,11,0.15);
+  color: #f59e0b;
+}
+.timestamp { font-size: 0.8rem; color: #64748b; }
+
+/* ===== SAVED LEADS TAB ===== */
+.saved-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.btn-secondary {
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #94a3b8;
+  transition: all 0.15s;
+}
+.btn-secondary:hover { border-color: #f59e0b; color: #f59e0b; }
+
+.btn-danger {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 6px;
+  color: #ef4444;
+  transition: all 0.15s;
+}
+.btn-danger:hover { background: rgba(239,68,68,0.12); }
+
+.saved-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.saved-card .info { min-width: 0; flex: 1; }
+.saved-card .info .name { font-weight: 600; font-size: 0.95rem; }
+.saved-card .info .meta { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+.saved-card .info .meta a { color: #64748b; font-size: 0.8rem; }
+
+.export-hint {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.82rem;
+  padding: 16px;
+  margin-top: 8px;
+  border-top: 1px solid #334155;
+}
+
+/* ===== CONFIRM DIALOG ===== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-dialog {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+}
+.confirm-dialog p { margin-bottom: 18px; font-size: 0.95rem; }
+.confirm-dialog .btns { display: flex; gap: 10px; justify-content: center; }
+.confirm-dialog .btns button {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+}
+.confirm-dialog .btns .btn-cancel { background: #334155; color: #e2e8f0; }
+.confirm-dialog .btns .btn-confirm { background: #ef4444; color: #fff; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .main { padding: 16px; }
+  .sidebar { width: 100%; max-width: 100%; }
+  th, td { padding: 10px 8px; font-size: 0.8rem; }
+  .search-wrapper { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>🔍 SiteSpy</h1>
+  <div class="subtitle">Find local businesses that need a better website</div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button id="tab-analyze" class="active" onclick="switchTab('analyze')">🔍 Analyze</button>
+  <button id="tab-saved" onclick="switchTab('saved')">📋 Saved Leads <span id="saved-badge" class="badge" style="display:none">0</span></button>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="main-content"></div>
+
+<!-- DETAIL SIDEBAR -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+<div class="sidebar" id="sidebar"></div>
+
+<!-- CONFIRM DIALOG (hidden) -->
+<div id="confirm-dialog" style="display:none"></div>
+
+<script>
+// ===== STATE =====
+let activeTab = 'analyze';
+let searchResults = [];
+let savedLeads = [];
+let currentDetailLead = null;
+let isLoading = false;
+let hideModern = true;
+
+// ===== LOCALSTORAGE =====
+function loadSavedLeads() {
+  try {
+    const data = localStorage.getItem('sitespy_saved_leads');
+    savedLeads = data ? JSON.parse(data) : [];
+  } catch(e) { savedLeads = []; }
+}
+function saveToStorage() {
+  localStorage.setItem('sitespy_saved_leads', JSON.stringify(savedLeads));
+}
+function isLeadSaved(id) {
+  return savedLeads.some(l => l.id === id);
+}
+function toggleSaveLead(lead) {
+  const idx = savedLeads.findIndex(l => l.id === lead.id);
+  if (idx >= 0) {
+    savedLeads.splice(idx, 1);
+  } else {
+    savedLeads.push({ ...lead, savedAt: new Date().toISOString() });
+  }
+  saveToStorage();
+  updateSavedBadge();
+}
+
+// ===== SEED DATA =====
+const SEED_LEADS = [
+  {
+    id: "seed-1", name: "Joe's Plumbing", niche: "plumbers",
+    address: "123 Main St, Austin, TX 78701", phone: "+15125551234",
+    rating: 4.3, ratingCount: 47, website: "",
+    status: "No Website", design: "N/A", mobileFriendly: false,
+    signals: [], socialPlatform: null, priority: 0,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  },
+  {
+    id: "seed-2", name: "Elite Cuts Barbershop", niche: "barbers",
+    address: "456 Colfax Ave, Denver, CO 80203", phone: "+13035559876",
+    rating: 4.6, ratingCount: 128, website: "https://instagram.com/elitecutsdenver",
+    status: "Social Only", design: "N/A", mobileFriendly: false,
+    signals: [], socialPlatform: "Instagram", priority: 1,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  },
+  {
+    id: "seed-3", name: "QuickFix Electric", niche: "electricians",
+    address: "789 Burnside St, Portland, OR 97209", phone: "+15035551111",
+    rating: 3.9, ratingCount: 33, website: "https://quickfixelectric-pdx.com",
+    status: "Poorly Built", design: "Poorly Built", mobileFriendly: false,
+    signals: ["<font> tags", "Table-based layout", "Broken images (2)"],
+    socialPlatform: null, priority: 3,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  },
+  {
+    id: "seed-4", name: "Sunrise Dental", niche: "dentists",
+    address: "101 Camelback Rd, Phoenix, AZ 85016", phone: "+16025554444",
+    rating: 4.1, ratingCount: 89, website: "https://sunrisedentalphx.com",
+    status: "Outdated", design: "Outdated", mobileFriendly: false,
+    signals: ["<marquee> tags", "Old copyright (2012)", "Table-based layout"],
+    socialPlatform: null, priority: 5,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  },
+  {
+    id: "seed-5", name: "Metro HVAC", niche: "hvac",
+    address: "200 Michigan Ave, Chicago, IL 60601", phone: "+13125552222",
+    rating: 4.5, ratingCount: 156, website: "https://metrohvac-chicago.com",
+    status: "Website Unavailable", design: "N/A", mobileFriendly: false,
+    signals: [], socialPlatform: null, priority: 2,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  },
+  {
+    id: "seed-6", name: "Green Leaf Landscaping", niche: "landscaping",
+    address: "300 Pine St, Seattle, WA 98101", phone: "+12065553333",
+    rating: 4.7, ratingCount: 203, website: "https://greenleafseattle.com",
+    status: "Basic", design: "Basic", mobileFriendly: true,
+    signals: ["Mobile Viewport", "Flexbox"],
+    socialPlatform: null, priority: 8,
+    lastAnalyzed: new Date().toISOString(), savedAt: new Date().toISOString()
+  }
+];
+
+function loadSeedLeads() {
+  for (const lead of SEED_LEADS) {
+    if (!isLeadSaved(lead.id)) {
+      savedLeads.push({ ...lead });
+    }
+  }
+  saveToStorage();
+  updateSavedBadge();
+  renderCurrentTab();
+}
+
+// ===== TAB SWITCHING =====
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-analyze').classList.toggle('active', tab === 'analyze');
+  document.getElementById('tab-saved').classList.toggle('active', tab === 'saved');
+  closeSidebar();
+  renderCurrentTab();
+}
+
+function updateSavedBadge() {
+  const badge = document.getElementById('saved-badge');
+  if (savedLeads.length > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = savedLeads.length;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ===== RENDER =====
+function renderCurrentTab() {
+  const main = document.getElementById('main-content');
+  if (activeTab === 'analyze') renderAnalyzeTab(main);
+  else renderSavedTab(main);
+}
+
+// ===== ANALYZE TAB =====
+function renderAnalyzeTab(main) {
+  const html = `
+    <div class="search-wrapper">
+      <input type="text" id="search-input" placeholder="e.g., plumbers Austin TX"
+             onkeydown="if(event.key==='Enter')doSearch()" autocomplete="off">
+      <select id="max-results">
+        <option value="5">5 results</option>
+        <option value="10">10 results</option>
+        <option value="15">15 results</option>
+        <option value="20" selected>20 results</option>
+      </select>
+      <button class="btn-search" id="btn-search" onclick="doSearch()">🔍 Search</button>
+    </div>
+    <div class="filter-row">
+      <input type="checkbox" id="hide-modern" ${hideModern ? 'checked' : ''}
+             onchange="hideModern=this.checked;renderResults()">
+      <label for="hide-modern">Hide modern websites</label>
+    </div>
+    <div id="analyze-results"></div>
+  `;
+  main.innerHTML = html;
+  renderEmptyState();
+}
+
+function renderEmptyState() {
+  const area = document.getElementById('analyze-results');
+  area.innerHTML = `
+    <div class="state-box">
+      <div class="icon">🔎</div>
+      <div class="title">Search for local businesses</div>
+      <div class="desc">Enter a niche and location above — like "plumbers Austin TX" or "dentists Denver CO" — and SiteSpy will find businesses that need website help.</div>
+    </div>
+  `;
+}
+
+function renderLoading() {
+  const area = document.getElementById('analyze-results');
+  area.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <div class="title" style="margin-top:16px">Scanning businesses...</div>
+      <div class="desc">Searching Google Places and analyzing websites</div>
+    </div>
+  `;
+}
+
+function renderError(msg) {
+  const area = document.getElementById('analyze-results');
+  area.innerHTML = `
+    <div class="error-msg">⚠️ ${escapeHtml(msg)}</div>
+    <div class="state-box">
+      <div class="icon">😕</div>
+      <div class="title">Something went wrong</div>
+      <div class="desc">Try a different search or check back later.</div>
+    </div>
+  `;
+}
+
+function renderResults() {
+  const area = document.getElementById('analyze-results');
+  let filtered = searchResults;
+  if (hideModern) {
+    filtered = searchResults.filter(r => !(r.status === 'Modern' && r.mobileFriendly));
+  }
+  if (searchResults.length === 0 && !isLoading) {
+    renderEmptyState();
+    return;
+  }
+  if (filtered.length === 0) {
+    if (hideModern && searchResults.length > 0) {
+      area.innerHTML = `
+        <div class="state-box">
+          <div class="icon">🎯</div>
+          <div class="title">All leads filtered out</div>
+          <div class="desc">All ${searchResults.length} result(s) have modern, mobile-friendly websites. Try unchecking "Hide modern websites" to see them.</div>
+        </div>
+      `;
+    } else {
+      area.innerHTML = `
+        <div class="state-box">
+          <div class="icon">📭</div>
+          <div class="title">No leads found</div>
+          <div class="desc">Try a different search or broaden your terms.</div>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  let rows = '';
+  for (const r of filtered) {
+    const domain = extractDomain(r.website);
+    const statusClass = statusToClass(r.status);
+    const saved = isLeadSaved(r.id);
+    rows += `
+      <tr onclick="openDetail('${escapeAttr(r.id)}')">
+        <td class="name-col">${escapeHtml(r.name)}</td>
+        <td>${escapeHtml(r.niche)}</td>
+        <td class="website-col">${domain ? `<a href="${escapeAttr(r.website)}" target="_blank" onclick="event.stopPropagation()" title="${escapeAttr(r.website)}">${escapeHtml(domain)}</a>` : '<span style="color:#64748b">—</span>'}</td>
+        <td><span class="status-badge ${statusClass}">${escapeHtml(r.status)}</span></td>
+        <td>${escapeHtml(r.design)}</td>
+        <td>${r.mobileFriendly ? '<span class="mobile-icon mobile-ok">✅</span>' : '<span class="mobile-icon mobile-bad">❌</span>'}</td>
+        <td><button class="btn-save ${saved ? 'saved' : ''}" onclick="event.stopPropagation();toggleSaveLeadById('${escapeAttr(r.id)}');renderResults();">${saved ? '★ Saved' : '☆ Save'}</button></td>
+      </tr>
+    `;
+  }
+
+  area.innerHTML = `
+    <div style="margin-bottom:8px;font-size:0.85rem;color:#94a3b8">
+      Showing ${filtered.length} of ${searchResults.length} result(s)
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Business</th><th>Niche</th><th>Website</th><th>Status</th><th>Design</th><th>Mobile</th><th>Save</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ===== SEARCH =====
+async function doSearch() {
+  if (isLoading) return;
+  const input = document.getElementById('search-input');
+  const q = input.value.trim();
+  if (!q) return;
+
+  const max = document.getElementById('max-results').value;
+  const btn = document.getElementById('btn-search');
+  isLoading = true;
+  btn.disabled = true;
+  searchResults = [];
+  renderLoading();
+
+  try {
+    const resp = await fetch(`/api/analyze?q=${encodeURIComponent(q)}&max=${max}`);
+    const data = await resp.json();
+    if (data.error) {
+      // If there are results despite the error, show them; otherwise error
+      if (data.results && data.results.length > 0) {
+        searchResults = data.results;
+        renderResults();
+      } else {
+        renderError(data.error);
+      }
+    } else {
+      searchResults = data.results || [];
+      renderResults();
+    }
+  } catch(e) {
+    renderError('Network error — could not reach the server. Is the backend running?');
+  } finally {
+    isLoading = false;
+    btn.disabled = false;
+  }
+}
+
+// ===== SIDEBAR =====
+function openDetail(id) {
+  const lead = searchResults.find(r => r.id === id);
+  if (!lead) return;
+  currentDetailLead = lead;
+  const saved = isLeadSaved(id);
+  const statusClass = statusToClass(lead.status);
+  const starsHtml = lead.rating ? ('★'.repeat(Math.round(lead.rating)) + '☆'.repeat(5 - Math.round(lead.rating))) : '';
+  const domain = extractDomain(lead.website);
+  let priorityLabel, priorityClass;
+  if (lead.priority <= 2) { priorityLabel = 'High Priority'; priorityClass = 'priority-high'; }
+  else if (lead.priority <= 5) { priorityLabel = 'Medium Priority'; priorityClass = 'priority-med'; }
+  else { priorityLabel = 'Low Priority'; priorityClass = 'priority-low'; }
+
+  const signalsHtml = lead.signals && lead.signals.length
+    ? lead.signals.map(s => `<span class="signal-chip">${escapeHtml(s)}</span>`).join('')
+    : '<span style="color:#64748b;font-size:0.85rem">None detected</span>';
+
+  const html = `
+    <div class="sidebar-header">
+      <h2>${escapeHtml(lead.name)}</h2>
+      <button class="btn-close" onclick="closeSidebar()">✕</button>
+    </div>
+    <div class="sidebar-body">
+      <span class="status-badge ${statusClass}" style="align-self:flex-start">${escapeHtml(lead.status)}</span>
+      <div class="field"><span class="label">Address</span><span class="value">${escapeHtml(lead.address || 'N/A')}</span></div>
+      <div class="field"><span class="label">Phone</span>${lead.phone ? `<a class="value" href="tel:${escapeAttr(lead.phone)}">${escapeHtml(lead.phone)}</a>` : '<span class="value" style="color:#64748b">N/A</span>'}</div>
+      <div class="field"><span class="label">Rating</span><span class="value">${lead.rating ? `<span class="rating-stars">${starsHtml}</span> ${lead.rating} (${lead.ratingCount} reviews)` : '<span style="color:#64748b">No ratings</span>'}</span></div>
+      <div class="field"><span class="label">Website</span>${domain ? `<a class="value" href="${escapeAttr(lead.website)}" target="_blank">${escapeHtml(lead.website)}</a>` : '<span class="value" style="color:#64748b">None</span>'}</div>
+      <div class="field"><span class="label">Design</span><span class="value">${escapeHtml(lead.design)}</span></div>
+      <div class="field"><span class="label">Signals</span><div class="signals-list">${signalsHtml}</div></div>
+      <div class="field"><span class="label">Mobile Friendly</span><span class="mobile-status ${lead.mobileFriendly ? 'yes' : 'no'}">${lead.mobileFriendly ? '✅ Yes' : '❌ No'}</span></div>
+      <div class="field"><span class="label">Priority</span><span class="priority-score ${priorityClass}">${priorityLabel} (${lead.priority})</span></div>
+      <button class="btn-save-lead ${saved ? 'saved' : ''}" onclick="toggleSaveLeadById('${escapeAttr(lead.id)}');openDetail('${escapeAttr(lead.id)}')">${saved ? '★ Lead Saved' : '☆ Save Lead'}</button>
+      <div class="timestamp">Last analyzed: ${formatDate(lead.lastAnalyzed)}</div>
+    </div>
+  `;
+  document.getElementById('sidebar').innerHTML = html;
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  currentDetailLead = null;
+  // Refresh results in case save state changed
+  if (activeTab === 'analyze' && searchResults.length > 0) renderResults();
+}
+
+function toggleSaveLeadById(id) {
+  const lead = searchResults.find(r => r.id === id);
+  if (!lead) return;
+  toggleSaveLead(lead);
+}
+
+// ===== SAVED LEADS TAB =====
+function renderSavedTab(main) {
+  if (savedLeads.length === 0) {
+    main.innerHTML = `
+      <div class="saved-actions">
+        <button class="btn-secondary" onclick="loadSeedLeads()">📥 Load Previous Leads</button>
+      </div>
+      <div class="state-box">
+        <div class="icon">📋</div>
+        <div class="title">No saved leads yet</div>
+        <div class="desc">Search for businesses and save the promising ones!</div>
+      </div>
+    `;
+    return;
+  }
+
+  let cards = '';
+  for (const lead of savedLeads) {
+    const statusClass = statusToClass(lead.status);
+    const domain = extractDomain(lead.website);
+    cards += `
+      <div class="saved-card">
+        <div class="info">
+          <div class="name">${escapeHtml(lead.name)}</div>
+          <div class="meta">
+            ${escapeHtml(lead.niche)} · <span class="status-badge ${statusClass}" style="font-size:0.7rem">${escapeHtml(lead.status)}</span>
+            ${domain ? ` · <a href="${escapeAttr(lead.website)}" target="_blank">${escapeHtml(domain)}</a>` : ''}
+            · Saved ${formatDate(lead.savedAt)}
+          </div>
+        </div>
+        <button class="btn-danger" onclick="confirmRemove('${escapeAttr(lead.id)}')">Remove</button>
+      </div>
+    `;
+  }
+
+  main.innerHTML = `
+    <div class="saved-actions">
+      <button class="btn-secondary" onclick="loadSeedLeads()">📥 Load Previous Leads</button>
+    </div>
+    ${cards}
+    <div class="export-hint">Pro tip: upgrade to Pro to export leads to CSV</div>
+  `;
+}
+
+// ===== CONFIRM REMOVE =====
+function confirmRemove(id) {
+  const lead = savedLeads.find(l => l.id === id);
+  if (!lead) return;
+  const dialog = document.getElementById('confirm-dialog');
+  dialog.style.display = 'block';
+  dialog.innerHTML = `
+    <div class="confirm-overlay" onclick="event.target===this&&cancelRemove()">
+      <div class="confirm-dialog" onclick="event.stopPropagation()">
+        <p>Remove <strong>${escapeHtml(lead.name)}</strong>?</p>
+        <div class="btns">
+          <button class="btn-cancel" onclick="cancelRemove()">Cancel</button>
+          <button class="btn-confirm" onclick="doRemove('${escapeAttr(id)}')">Remove</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function cancelRemove() {
+  document.getElementById('confirm-dialog').style.display = 'none';
+  document.getElementById('confirm-dialog').innerHTML = '';
+}
+
+function doRemove(id) {
+  savedLeads = savedLeads.filter(l => l.id !== id);
+  saveToStorage();
+  updateSavedBadge();
+  cancelRemove();
+  renderCurrentTab();
+}
+
+// ===== HELPERS =====
+function statusToClass(status) {
+  const map = {
+    'No Website': 'no-website',
+    'Social Only': 'social-only',
+    'Poorly Built': 'poorly-built',
+    'Outdated': 'outdated',
+    'Basic': 'basic',
+    'Modern': 'modern',
+    'Website Unavailable': 'website-unavailable',
+  };
+  return map[status] || '';
+}
+
+function extractDomain(url) {
+  if (!url) return '';
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host;
+  } catch { return ''; }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escapeAttr(str) {
+  return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatDate(iso) {
+  if (!iso) return 'N/A';
+  try {
+    return new Date(iso).toLocaleString();
+  } catch { return iso; }
+}
+
+// ===== INIT =====
+loadSavedLeads();
+updateSavedBadge();
+renderCurrentTab();
+
+// Close sidebar on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('sidebar').classList.contains('open')) {
+    closeSidebar();
+  }
+});
+</script>
+</body>
+</html>
