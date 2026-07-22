@@ -2,10 +2,12 @@ import os
 import re
 import json
 import time
+import io
+import csv
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 import requests
 from bs4 import BeautifulSoup
 
@@ -446,6 +448,249 @@ def save_lead():
         return jsonify({"error": "Invalid JSON body"}), 400
     # In the future we might persist to a database; for now just acknowledge
     return jsonify({"success": True, "message": "Lead saved"}), 200
+
+
+# ---------------------------------------------------------------------------
+# Export endpoints
+# ---------------------------------------------------------------------------
+
+CSV_HEADERS = [
+    "Business Name", "Niche", "Address", "Phone", "Rating", "Reviews",
+    "Website", "Status", "Design", "Mobile Friendly", "Signals", "Priority",
+    "Social Platform",
+]
+
+
+def _get_leads_from_request():
+    """Extract leads list from request body (JSON) or query param."""
+    # Try JSON body first (works for both GET and POST with body)
+    data = request.get_json(silent=True)
+    if data and isinstance(data, dict) and "leads" in data:
+        return data["leads"]
+
+    # Try query param: ?leads=<JSON array>
+    leads_param = request.args.get("leads", "")
+    if leads_param:
+        try:
+            parsed = json.loads(leads_param)
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return None
+
+
+def _build_csv(leads):
+    """Build CSV content with stats header + data rows."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Count by status
+    status_counts = {}
+    for lead in leads:
+        st = lead.get("status", "Unknown")
+        status_counts[st] = status_counts.get(st, 0) + 1
+
+    # Top niches
+    niche_counts = {}
+    for lead in leads:
+        niche = lead.get("niche", "Unknown")
+        niche_counts[niche] = niche_counts.get(niche, 0) + 1
+    top_niches = sorted(niche_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+
+    # Stats header
+    writer.writerow([f"# SiteSpy Lead Export — {today_str}"])
+    writer.writerow([f"# Total Leads: {len(leads)}"])
+    by_status = ", ".join(f"{st} ({cnt})" for st, cnt in sorted(status_counts.items()))
+    writer.writerow([f"# By Status: {by_status}"])
+    top_niches_str = ", ".join(f"{n} ({c})" for n, c in top_niches)
+    writer.writerow([f"# Top Niches: {top_niches_str}"])
+    writer.writerow([])  # blank row
+
+    # Data header
+    writer.writerow(CSV_HEADERS)
+
+    # Data rows
+    for lead in leads:
+        row = [
+            lead.get("name", ""),
+            lead.get("niche", ""),
+            lead.get("address", ""),
+            lead.get("phone", ""),
+            lead.get("rating", ""),
+            lead.get("ratingCount", ""),
+            lead.get("website", ""),
+            lead.get("status", ""),
+            lead.get("design", ""),
+            "Yes" if lead.get("mobileFriendly") else "No",
+            "; ".join(lead.get("signals", [])),
+            lead.get("priority", ""),
+            lead.get("socialPlatform", ""),
+        ]
+        writer.writerow(row)
+
+    return output.getvalue()
+
+
+@app.route("/api/export", methods=["GET", "POST"])
+def export_csv():
+    """Return saved leads as a downloadable CSV file."""
+    leads = _get_leads_from_request()
+    if leads is None:
+        return jsonify({"error": "No leads provided. Send JSON body with 'leads' array."}), 400
+    if not isinstance(leads, list):
+        return jsonify({"error": "'leads' must be an array."}), 400
+
+    csv_content = _build_csv(leads)
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=sitespy-leads-{today_str}.csv",
+            "Content-Type": "text/csv; charset=utf-8",
+        },
+    )
+
+
+@app.route("/api/export-to-sheets", methods=["POST"])
+def export_to_sheets():
+    """Create or append to a Google Sheet with lead data."""
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    leads = data.get("leads", [])
+    if not isinstance(leads, list) or not leads:
+        return jsonify({"error": "No leads provided. Send JSON body with 'leads' array."}), 400
+
+    sheet_name = data.get("sheetName", "SiteSpy Leads")
+    spreadsheet_id = data.get("spreadsheetId", None)
+
+    # Check for Google credentials
+    creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS", "")
+    if not creds_json:
+        return jsonify({
+            "error": "Google Sheets integration not configured. "
+                     "Set GOOGLE_SHEETS_CREDENTIALS or download the CSV instead.",
+            "configured": False,
+        }), 200
+
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
+
+        creds_dict = json.loads(creds_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        service = build("sheets", "v4", credentials=credentials)
+    except Exception as e:
+        return jsonify({
+            "error": f"Failed to initialize Google Sheets client: {str(e)}",
+            "configured": False,
+        }), 200
+
+    # Build data rows (including header)
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Stats
+    status_counts = {}
+    for lead in leads:
+        st = lead.get("status", "Unknown")
+        status_counts[st] = status_counts.get(st, 0) + 1
+    by_status = ", ".join(f"{st} ({cnt})" for st, cnt in sorted(status_counts.items()))
+
+    niche_counts = {}
+    for lead in leads:
+        niche = lead.get("niche", "Unknown")
+        niche_counts[niche] = niche_counts.get(niche, 0) + 1
+    top_niches = sorted(niche_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+    top_niches_str = ", ".join(f"{n} ({c})" for n, c in top_niches)
+
+    values = [
+        [f"SiteSpy Lead Export — {today_str}"],
+        [f"Total Leads: {len(leads)}"],
+        [f"By Status: {by_status}"],
+        [f"Top Niches: {top_niches_str}"],
+        [],
+        CSV_HEADERS,
+    ]
+
+    for lead in leads:
+        row = [
+            lead.get("name", ""),
+            lead.get("niche", ""),
+            lead.get("address", ""),
+            lead.get("phone", ""),
+            str(lead.get("rating", "")),
+            str(lead.get("ratingCount", "")),
+            lead.get("website", ""),
+            lead.get("status", ""),
+            lead.get("design", ""),
+            "Yes" if lead.get("mobileFriendly") else "No",
+            "; ".join(lead.get("signals", [])),
+            str(lead.get("priority", "")),
+            lead.get("socialPlatform", ""),
+        ]
+        values.append(row)
+
+    try:
+        if spreadsheet_id:
+            # Append to existing sheet
+            body = {"values": values}
+            service.spreadsheets().values().append(
+                spreadsheetId=spreadsheet_id,
+                range=f"'{sheet_name}'!A1",
+                valueInputOption="RAW",
+                insertDataOption="INSERT_ROWS",
+                body=body,
+            ).execute()
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+        else:
+            # Create new spreadsheet
+            spreadsheet_body = {
+                "properties": {"title": sheet_name},
+                "sheets": [{"properties": {"title": sheet_name}}],
+            }
+            sheet = service.spreadsheets().create(
+                body=spreadsheet_body, fields="spreadsheetId"
+            ).execute()
+            spreadsheet_id = sheet.get("spreadsheetId")
+
+            # Populate with data
+            body = {"values": values}
+            service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=f"'{sheet_name}'!A1",
+                valueInputOption="RAW",
+                body=body,
+            ).execute()
+
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+
+        return jsonify({
+            "success": True,
+            "spreadsheetId": spreadsheet_id,
+            "url": sheet_url,
+        }), 200
+
+    except HttpError as e:
+        return jsonify({
+            "error": f"Google Sheets API error: {str(e)}",
+            "configured": True,
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "error": f"Failed to export to Google Sheets: {str(e)}",
+            "configured": True,
+        }), 200
 
 
 @app.errorhandler(404)
