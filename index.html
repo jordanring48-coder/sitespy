@@ -91,10 +91,18 @@ button { cursor: pointer; font-family: inherit; }
   gap: 10px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  align-items: stretch;
 }
-.search-wrapper input[type="text"] {
+.autocomplete {
+  position: relative;
   flex: 1;
   min-width: 220px;
+  display: flex;
+}
+.autocomplete input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
   padding: 12px 16px;
   font-size: 0.95rem;
   background: #1e293b;
@@ -128,9 +136,55 @@ button { cursor: pointer; font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
 }
 .search-wrapper .btn-search:hover { opacity: 0.9; }
 .search-wrapper .btn-search:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== AUTOCOMPLETE DROPDOWNS ===== */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  max-height: 320px;
+  overflow-y: auto;
+  display: none;
+  padding: 4px;
+}
+.dropdown.open { display: block; }
+.dropdown .dd-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.dropdown .dd-item:hover,
+.dropdown .dd-item.active { background: #334155; }
+.dropdown .dd-item .dd-sub {
+  color: #64748b;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.dropdown .dd-loading,
+.dropdown .dd-none {
+  padding: 8px 12px;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+.dropdown .dd-none { font-style: italic; }
 
 .filter-row {
   display: flex;
@@ -507,6 +561,8 @@ td.website-col a {
   .sidebar { width: 100%; max-width: 100%; }
   th, td { padding: 10px 8px; font-size: 0.8rem; }
   .search-wrapper { flex-direction: column; }
+  .search-wrapper .autocomplete { min-width: 100%; }
+  .search-wrapper select, .search-wrapper .btn-search { width: 100%; justify-content: center; }
 }
 </style>
 </head>
@@ -664,8 +720,16 @@ function renderCurrentTab() {
 function renderAnalyzeTab(main) {
   const html = `
     <div class="search-wrapper">
-      <input type="text" id="search-input" placeholder="e.g., plumbers Austin TX"
-             onkeydown="if(event.key==='Enter')doSearch()" autocomplete="off">
+      <div class="autocomplete" id="niche-ac">
+        <input type="text" id="niche-input" placeholder="e.g., plumbers, roofers, dentists"
+               autocomplete="off" spellcheck="false">
+        <div class="dropdown" id="niche-dropdown"></div>
+      </div>
+      <div class="autocomplete" id="location-ac">
+        <input type="text" id="location-input" placeholder="e.g., Austin TX or 78704"
+               autocomplete="off" spellcheck="false">
+        <div class="dropdown" id="location-dropdown"></div>
+      </div>
       <select id="max-results">
         <option value="5">5 results</option>
         <option value="10">10 results</option>
@@ -682,6 +746,7 @@ function renderAnalyzeTab(main) {
     <div id="analyze-results"></div>
   `;
   main.innerHTML = html;
+  setupAutocomplete();
   renderEmptyState();
 }
 
@@ -692,7 +757,7 @@ function renderEmptyState() {
     <div class="state-box">
       <div class="icon">🔎</div>
       <div class="title">Search for local businesses</div>
-      <div class="desc">Enter a niche and location above — like "plumbers Austin TX" or "dentists Denver CO" — and SiteSpy will find businesses that need website help.</div>
+      <div class="desc">Enter a business niche and a location above — like "plumbers" + "Austin TX" — and SiteSpy will find businesses that need website help.</div>
     </div>
   `;
 }
@@ -791,10 +856,10 @@ function renderResults() {
 // ===== SEARCH =====
 async function doSearch() {
   if (isLoading) return;
-  const input = document.getElementById('search-input');
-  const q = input.value.trim();
-  if (!q) return;
-
+  const niche = (document.getElementById('niche-input').value || '').trim();
+  const loc = (document.getElementById('location-input').value || '').trim();
+  if (!niche && !loc) return;
+  const q = niche + ' ' + loc;
   const max = document.getElementById('max-results').value;
   const btn = document.getElementById('btn-search');
   isLoading = true;
@@ -822,6 +887,151 @@ async function doSearch() {
   } finally {
     isLoading = false;
     btn.disabled = false;
+  }
+}
+
+// ===== AUTOCOMPLETE =====
+const AUTOCOMPLETE_CONFIGS = [
+  {
+    inputId: 'niche-input', dropdownId: 'niche-dropdown',
+    url: '/api/suggest-niches', minChars: 1, type: 'niche'
+  },
+  {
+    inputId: 'location-input', dropdownId: 'location-dropdown',
+    url: '/api/suggest-locations', minChars: 2, type: 'location'
+  }
+];
+
+function setupAutocomplete() {
+  for (const cfg of AUTOCOMPLETE_CONFIGS) {
+    const input = document.getElementById(cfg.inputId);
+    const dd = document.getElementById(cfg.dropdownId);
+    if (!input || !dd) continue;
+
+    let debounceTimer = null;
+    let reqCounter = 0;          // race protection: only latest response renders
+    let items = [];              // current suggestion list (strings or {label,main,sub})
+    let activeIdx = -1;          // keyboard-highlighted row
+    let closeTimer = null;
+
+    function closeDropdown() {
+      dd.classList.remove('open');
+      dd.innerHTML = '';
+      items = [];
+      activeIdx = -1;
+    }
+
+    function selectItem(idx) {
+      const item = items[idx];
+      if (!item) return;
+      if (cfg.type === 'location') {
+        input.value = item.label;
+      } else {
+        input.value = item;
+      }
+      input.focus();
+      closeDropdown();
+    }
+
+    function renderRows(list) {
+      if (!list.length) {
+        dd.innerHTML = '<div class="dd-none">No suggestions</div>';
+        dd.classList.add('open');
+        return;
+      }
+      dd.innerHTML = list.map((item, i) => {
+        if (cfg.type === 'location') {
+          const sub = item.sub ? `<span class="dd-sub">${escapeHtml(item.sub)}</span>` : '';
+          return `<div class="dd-item" data-idx="${i}" title="${escapeAttr(item.label)}">
+            <span class="dd-main">${escapeHtml(item.main || item.label)}</span>${sub}
+          </div>`;
+        }
+        return `<div class="dd-item" data-idx="${i}">${escapeHtml(item)}</div>`;
+      }).join('');
+      dd.classList.add('open');
+    }
+
+    function highlight(idx) {
+      activeIdx = idx;
+      const rows = dd.querySelectorAll('.dd-item');
+      rows.forEach((r, i) => r.classList.toggle('active', i === idx));
+      if (rows[idx]) rows[idx].scrollIntoView({ block: 'nearest' });
+    }
+
+    async function fetchSuggestions(q) {
+      const myReq = ++reqCounter;
+      // loading row while in flight
+      dd.innerHTML = '<div class="dd-loading">…</div>';
+      dd.classList.add('open');
+      try {
+        const resp = await fetch(`${cfg.url}?q=${encodeURIComponent(q)}`);
+        if (myReq !== reqCounter) return; // stale response — ignore
+        const data = await resp.json();
+        if (myReq !== reqCounter) return;
+        const suggs = data.suggestions || [];
+        if (cfg.type === 'location') {
+          items = suggs.filter(s => s && s.label);
+        } else {
+          items = suggs.filter(s => typeof s === 'string');
+        }
+        activeIdx = -1;
+        renderRows(items);
+      } catch (e) {
+        if (myReq !== reqCounter) return;
+        closeDropdown();
+      }
+    }
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      clearTimeout(closeTimer);
+      const q = input.value.trim();
+      if (q.length < cfg.minChars) {
+        reqCounter++;           // invalidate in-flight request
+        closeDropdown();
+        return;
+      }
+      debounceTimer = setTimeout(() => fetchSuggestions(q), 250);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const open = dd.classList.contains('open') && items.length > 0;
+      if (e.key === 'ArrowDown') {
+        if (!open) return;
+        e.preventDefault();
+        highlight((activeIdx + 1) % items.length);
+      } else if (e.key === 'ArrowUp') {
+        if (!open) return;
+        e.preventDefault();
+        highlight((activeIdx - 1 + items.length) % items.length);
+      } else if (e.key === 'Enter') {
+        if (open && activeIdx >= 0) {
+          e.preventDefault();
+          selectItem(activeIdx);
+        } else if (open) {
+          // dropdown open but nothing highlighted — fall through to search
+          closeDropdown();
+          doSearch();
+        } else {
+          doSearch();
+        }
+      } else if (e.key === 'Escape') {
+        if (open) { e.preventDefault(); closeDropdown(); }
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      // small delay so a click on a dropdown row registers first
+      closeTimer = setTimeout(closeDropdown, 150);
+    });
+
+    dd.addEventListener('mousedown', (e) => e.preventDefault()); // keep input focus
+    dd.addEventListener('click', (e) => {
+      const row = e.target.closest('.dd-item');
+      if (!row) return;
+      clearTimeout(closeTimer);
+      selectItem(parseInt(row.dataset.idx, 10));
+    });
   }
 }
 

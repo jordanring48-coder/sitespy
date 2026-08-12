@@ -80,6 +80,102 @@ MAJOR_CITIES = {
 }
 
 
+# Curated list of common local business niches for the autocomplete endpoint
+NICHES = [
+    # Trades & construction
+    "Plumbers", "Plumbing Contractors", "Electricians", "Electrical Contractors",
+    "Roofers", "Roofing Contractors", "HVAC Contractors", "Heating and Air Conditioning",
+    "Air Conditioning Repair", "Furnace Repair", "Landscapers", "Landscaping Companies",
+    "Lawn Care Services", "Lawn Mowing Services", "Handymen", "Handyman Services",
+    "Painters", "Painting Contractors", "General Contractors", "Home Builders",
+    "Carpenters", "Cabinet Makers", "Welders", "Concrete Contractors",
+    "Masonry Contractors", "Tile Installers", "Flooring Contractors", "Carpet Installers",
+    "Drywall Contractors", "Siding Contractors", "Fence Contractors", "Deck Builders",
+    "Window Installers", "Door Installers", "Gutter Installation", "Gutter Cleaners",
+    "Window Cleaners", "Chimney Sweeps", "Solar Panel Installers", "Insulation Contractors",
+    "Excavation Contractors", "Asphalt Paving", "Septic Services", "Well Drilling",
+    "Garage Door Repair", "Locksmiths", "Foundation Repair", "Waterproofing Contractors",
+    "Pool Builders", "Pool Cleaners", "Hot Tub Repair", "Tree Services",
+    "Stump Grinding", "Snow Removal", "Sprinkler Systems", "Irrigation Services",
+    "Pest Control", "Exterminators", "Termite Control", "Mold Remediation",
+    "Fire and Water Damage Restoration", "Duct Cleaning", "Appliance Repair", "Power Washing",
+    "Pressure Washing", "Awning Installers",
+    # Home services
+    "House Cleaning Services", "Maid Services", "Carpet Cleaning", "Upholstery Cleaning",
+    "Moving Companies", "Movers", "Junk Removal", "Decluttering Services",
+    "Home Organization", "Property Management", "Home Inspectors", "House Sitters",
+    "Storage Facilities", "Self Storage", "Packing Services", "Smart Home Installation",
+    # Professional services
+    "Accountants", "CPAs", "Bookkeepers", "Tax Preparation Services",
+    "Tax Consultants", "Lawyers", "Attorneys", "Law Firms",
+    "Personal Injury Lawyers", "Family Lawyers", "Criminal Defense Lawyers", "Real Estate Attorneys",
+    "Real Estate Agents", "Realtors", "Insurance Agents", "Insurance Brokers",
+    "Financial Advisors", "Financial Planners", "Notaries", "Paralegals",
+    "Appraisers", "Title Companies",
+    # Health & wellness
+    "Dentists", "Orthodontists", "Oral Surgeons", "Pediatric Dentists",
+    "Chiropractors", "Physical Therapists", "Massage Therapists", "Acupuncturists",
+    "Therapists", "Counselors", "Psychologists", "Psychiatrists",
+    "Family Doctors", "Pediatricians", "Dermatologists", "Optometrists",
+    "Eye Doctors", "Veterinarians", "Animal Hospitals", "Urgent Care Centers",
+    "Medical Spas", "Med Spas", "Nutritionists", "Audiologists",
+    "Podiatrists", "Personal Trainers",
+    # Beauty & grooming
+    "Hair Salons", "Barbers", "Barbershops", "Nail Salons",
+    "Nail Technicians", "Spas", "Day Spas", "Tanning Salons",
+    "Makeup Artists", "Estheticians", "Waxing Salons", "Lash Extensions",
+    "Eyebrow Threading", "Hair Removal Services", "Beauty Salons",
+    # Automotive
+    "Auto Repair", "Car Repair", "Auto Body Shops", "Auto Detailing",
+    "Car Washes", "Towing Companies", "Tire Shops", "Oil Change Services",
+    "Transmission Repair", "Brake Repair", "Auto Glass Repair", "Windshield Replacement",
+    "Car Dealerships", "Used Car Dealerships", "Motorcycle Repair", "RV Repair",
+    "Boat Repair", "Diesel Repair", "Mechanics", "Fleet Services",
+    # Food & drink
+    "Restaurants", "Pizza Places", "Bakeries", "Caterers",
+    "Catering Companies", "Food Trucks", "Coffee Shops", "Cafes",
+    "Bars", "Breweries", "Wineries", "Ice Cream Shops",
+    "Donut Shops", "Dessert Shops", "Meal Prep Services", "Personal Chefs",
+    "Juice Bars", "BBQ Restaurants", "Sushi Restaurants", "Mexican Restaurants",
+    "Italian Restaurants", "Chinese Restaurants", "Breakfast Spots", "Diners",
+    "Sandwich Shops", "Burger Joints", "Delis", "Seafood Restaurants",
+    "Vegan Restaurants",
+    # Events & weddings
+    "Wedding Planners", "Photographers", "Wedding Photographers", "Videographers",
+    "Event Planners", "Event Venues", "Wedding Venues", "DJs",
+    "Photo Booths", "Florists", "Balloon Artists", "Party Rentals",
+    "Bounce House Rentals", "Limo Services", "Event Bartenders",
+    # Education & childcare
+    "Tutors", "Tutoring Services", "Learning Centers", "Music Lessons",
+    "Dance Studios", "Art Classes", "Driving Schools", "Preschools",
+    "Daycares", "Childcare Centers", "Summer Camps", "Martial Arts Studios",
+    "Yoga Studios", "Gymnastics Centers", "Swimming Lessons", "Test Prep Services",
+    "Language Schools",
+    # Pets
+    "Pet Groomers", "Dog Groomers", "Dog Walkers", "Pet Sitters",
+    "Dog Trainers", "Boarding Kennels", "Pet Daycares", "Pet Stores",
+    "Pet Boarding", "Aquarium Services",
+    # Fitness & recreation
+    "Gyms", "Fitness Centers", "CrossFit Gyms", "Pilates Studios",
+    "Boot Camps", "Sports Leagues", "Golf Courses", "Tennis Clubs",
+    "Dance Fitness Classes",
+    # Entertainment
+    "Movie Theaters", "Escape Rooms", "Arcades", "Bowling Alleys",
+    "Trampoline Parks", "Axe Throwing", "Museums", "Zoos",
+    "Aquariums", "Comedy Clubs",
+    # Retail & other services
+    "Dry Cleaners", "Laundromats", "Tailors", "Shoe Repair",
+    "Watch Repair", "Jewelry Stores", "Pawn Shops", "Thrift Stores",
+    "Antique Shops", "Gift Shops", "Bookstores", "Liquor Stores",
+    "Vape Shops", "Dispensaries", "Smoke Shops", "Garden Centers",
+    "Nurseries", "Hardware Stores", "Home Improvement Stores", "Furniture Stores",
+    "Mattress Stores", "Appliance Stores", "Electronics Repair", "Phone Repair",
+    "Computer Repair", "IT Services", "Web Design Agencies", "Marketing Agencies",
+    "Print Shops", "Sign Shops", "Screen Printing", "Embroidery Services",
+    "Shipping Centers", "Travel Agencies", "Hotels", "Bed and Breakfasts",
+    "Vacation Rentals", "Airbnb Management", "Funeral Homes", "Churches",
+]
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -438,6 +534,58 @@ def analyze():
     results.sort(key=lambda r: r["priority"])
 
     return jsonify({"results": results, "count": len(results)})
+
+
+@app.route("/api/suggest-niches", methods=["GET"])
+def suggest_niches():
+    """Autocomplete for business niches from the curated NICHES list."""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"suggestions": []})
+    lower = q.lower()
+    prefix = [n for n in NICHES if n.lower().startswith(lower)]
+    substring = [n for n in NICHES if lower in n.lower() and not n.lower().startswith(lower)]
+    return jsonify({"suggestions": (prefix + substring)[:10]})
+
+
+@app.route("/api/suggest-locations", methods=["GET"])
+def suggest_locations():
+    """Autocomplete for locations (cities/zips) via Google Places Autocomplete (New)."""
+    q = (request.args.get("q") or "").strip()
+    if not q or not GOOGLE_PLACES_API_KEY:
+        return jsonify({"suggestions": []})
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        }
+        body = {
+            "input": q,
+            "includedPrimaryTypes": ["locality", "postal_code"],
+            "regionCode": "us",
+        }
+        resp = requests.post(
+            "https://places.googleapis.com/v1/places:autocomplete",
+            headers=headers,
+            json=body,
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return jsonify({"suggestions": []})
+        data = resp.json()
+        suggestions = []
+        for s in data.get("suggestions", [])[:6]:
+            pred = s.get("placePrediction") or {}
+            text = pred.get("text") or {}
+            fmt = pred.get("structuredFormat") or {}
+            main = (fmt.get("mainText") or {}).get("text", "")
+            sub = (fmt.get("secondaryText") or {}).get("text", "")
+            label = text.get("text") or (main + (", " + sub if sub else ""))
+            if label:
+                suggestions.append({"label": label, "main": main, "sub": sub})
+        return jsonify({"suggestions": suggestions})
+    except Exception:
+        return jsonify({"suggestions": []})
 
 
 @app.route("/api/save-lead", methods=["POST"])
